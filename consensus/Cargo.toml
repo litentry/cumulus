@@ -15,6 +15,8 @@ sr-primitives = { git = "https://github.com/paritytech/substrate", branch = "bkc
 # polkadot deps
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot", branch = "bkchr-cumulus-branch" }
 polkadot-runtime = { git = "https://github.com/paritytech/polkadot", branch = "bkchr-cumulus-branch" }
+polkadot-statement-table = { git = "https://github.com/paritytech/polkadot", branch = "bkchr-cumulus-branch" }
+polkadot-validation = { git = "https://github.com/paritytech/polkadot", branch = "bkchr-cumulus-branch" }
 
 # other deps
 futures = { package = "futures-preview", version = "0.3.0-alpha.19", features = ["compat"] }

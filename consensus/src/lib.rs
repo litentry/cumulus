@@ -23,14 +23,22 @@ use sr_primitives::{
 	generic::BlockId,
 	traits::{Block as BlockT, Header as HeaderT, ProvideRuntimeApi},
 };
-use substrate_consensus_common::{Error as ConsensusError, SelectChain as SelectChainT};
-
-use polkadot_primitives::{
-	Hash as PHash, Block as PBlock, parachain::{Id as ParaId, ParachainHost},
+use substrate_consensus_common::{
+	Error as ConsensusError, SelectChain as SelectChainT,
+	block_validation::{Validation, BlockAnnounceValidator},
 };
 
+use polkadot_primitives::{
+	Hash as PHash, Block as PBlock,
+	parachain::{
+		Id as ParaId, ParachainHost, CandidateReceipt, ValidatorIndex, ValidatorSignature,
+	},
+};
+use polkadot_statement_table::Statement;
+use polkadot_validation::{check_statement, SharedTable};
+
 use futures::{Stream, StreamExt, TryStreamExt, future, Future, TryFutureExt, FutureExt};
-use codec::Decode;
+use codec::{Decode, Encode};
 use log::warn;
 
 use std::{sync::Arc, marker::PhantomData};
@@ -237,5 +245,74 @@ impl<Block, PC, SC> SelectChainT<Block> for SelectChain<Block, PC, SC> where
 					"Could not find parachain head for best relay chain!".into()),
 			)
 		}
+	}
+}
+
+#[derive(Encode, Decode)]
+/// Justification that a parachain block is the parachain block candidate of one of the relay chain
+/// validator.
+pub struct BlockCandidateJustification {
+	/// Receipt of the parachain block candidate of the signer.
+	candidate_receipt: CandidateReceipt,
+	/// Signer of `signature`.
+	signer: ValidatorIndex,
+	/// Signature of the Candidate statement with `candidate_receipt`.
+	signature: ValidatorSignature,
+	/// The parent block of which the candidate must be include.
+	relay_chain_parent_hash: PHash,
+}
+
+/// Validate that data is a valid justification form a relay-chain validator that the block is a
+/// valid parachain-block candidate.
+pub struct JustifiedBlockAnnounceValidator<B> {
+	authorities: Vec<ValidatorId>,
+	phantom: PhantomData<B>,
+}
+
+impl<B: BlockT> JustifiedBlockAnnounceValidator<B> {
+	pub fn new(authorities: Vec<ValidatorId>) -> Self {
+		Self {
+			authorities,
+			phantom: Default::default(),
+		}
+	}
+}
+
+impl<B: BlockT> BlockAnnounceValidator<B> for JustifiedBlockAnnounceValidator<B> {
+	fn validate(&mut self, header: &B::Header, mut data: &[u8])
+		-> Result<Validation, Box<dyn std::error::Error + Send>>
+	{
+		let justification = BlockCandidateJustification::decode(&mut data)
+			.map_err(|_| Box::new(ClientError::BadJustification(
+				"cannot decode block candidate justification".to_string()
+			)) as Box<_>)?;
+
+		// Check the header in the candidate_receipt match header given header.
+		if header.encode() != justification.candidate_receipt.head_data.0 {
+			return Err(Box::new(ClientError::BadJustification(
+				"block candidate header does not match its justification".to_string()
+			)) as Box<_>)
+		}
+
+		// Check that the signer is a legit validator.
+		let signer = self.authorities.get(justification.signer)
+			.ok_or_else(|| Box::new(ClientError::BadJustification(
+				"block candidate justification signer is a validator index out of bound".to_string()
+			)) as Box<_>)?;
+
+		// Check statement is signed.
+		let statement = Statement::Candidate(justification.candidate_receipt);
+		if !check_statement(
+			&statement,
+			&justification.signature,
+			signer,
+			&justification.relay_chain_parent_hash
+		) {
+			return Err(Box::new(ClientError::BadJustification(
+				"block candidate justification signature is invalid".to_string()
+			)) as Box<_>)
+		}
+
+		Ok(Validation::Success)
 	}
 }
