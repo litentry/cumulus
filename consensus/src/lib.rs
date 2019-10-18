@@ -32,10 +32,11 @@ use polkadot_primitives::{
 	Hash as PHash, Block as PBlock,
 	parachain::{
 		Id as ParaId, ParachainHost, CandidateReceipt, ValidatorIndex, ValidatorSignature,
+		ValidatorId,
 	},
 };
 use polkadot_statement_table::Statement;
-use polkadot_validation::{check_statement, SharedTable};
+use polkadot_validation::check_statement;
 
 use futures::{Stream, StreamExt, TryStreamExt, future, Future, TryFutureExt, FutureExt};
 use codec::{Decode, Encode};
@@ -295,7 +296,7 @@ impl<B: BlockT> BlockAnnounceValidator<B> for JustifiedBlockAnnounceValidator<B>
 		}
 
 		// Check that the signer is a legit validator.
-		let signer = self.authorities.get(justification.signer)
+		let signer = self.authorities.get(justification.signer as usize)
 			.ok_or_else(|| Box::new(ClientError::BadJustification(
 				"block candidate justification signer is a validator index out of bound".to_string()
 			)) as Box<_>)?;
@@ -305,7 +306,7 @@ impl<B: BlockT> BlockAnnounceValidator<B> for JustifiedBlockAnnounceValidator<B>
 		if !check_statement(
 			&statement,
 			&justification.signature,
-			signer,
+			signer.clone(),
 			&justification.relay_chain_parent_hash
 		) {
 			return Err(Box::new(ClientError::BadJustification(
