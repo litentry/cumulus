@@ -9296,7 +9296,8 @@ dependencies = [
 [[package]]
 name = "substrate-wasm-builder"
 version = "3.0.0"
-source = "git+https://github.com/paritytech/substrate#f977fb8a16548534481ba1dac948fa6835c1835d"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79091baab813855ddf65b191de9fe53e656b6b67c1e9bd23fdcbff8788164684"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -9311,8 +9312,7 @@ dependencies = [
 [[package]]
 name = "substrate-wasm-builder"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79091baab813855ddf65b191de9fe53e656b6b67c1e9bd23fdcbff8788164684"
+source = "git+https://github.com/paritytech/substrate#f977fb8a16548534481ba1dac948fa6835c1835d"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
